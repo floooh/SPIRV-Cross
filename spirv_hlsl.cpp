@@ -1566,15 +1566,19 @@ void CompilerHLSL::emit_instruction(const Instruction &instruction)
 
 	switch (opcode)
 	{
+	case OpVectorTimesMatrix:
 	case OpMatrixTimesVector:
 	{
-		emit_binary_func_op(ops[0], ops[1], ops[3], ops[2], "mul");
-		break;
-	}
-
-	case OpVectorTimesMatrix:
-	{
-		emit_binary_func_op(ops[0], ops[1], ops[3], ops[2], "mul");
+		// If the matrix needs transpose, just flip the multiply order.
+		auto *e = maybe_get<SPIRExpression>(ops[opcode == OpMatrixTimesVector ? 2 : 3]);
+		if (e && e->need_transpose)
+		{
+			e->need_transpose = false;
+			emit_binary_func_op(ops[0], ops[1], ops[3], ops[2], "mul");
+			e->need_transpose = true;
+		}
+		else
+			emit_binary_func_op(ops[0], ops[1], ops[2], ops[3], "mul");
 		break;
 	}
 
@@ -1819,6 +1823,7 @@ string CompilerHLSL::compile()
 	backend.explicit_struct_type = false;
 	backend.use_initializer_list = true;
 	backend.use_constructor_splatting = false;
+	backend.native_row_major_matrix = false;
 
 	update_active_builtins();
 
